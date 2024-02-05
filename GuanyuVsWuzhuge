@@ -1,0 +1,554 @@
+import java.util.*;
+
+public class Main {
+    public static void main(String[] args) {
+        int i = 0;
+        int success = 0;
+        while(i<100000){
+            Map result = fight();
+            if((Boolean) result.get("result")){
+                success++;
+                System.out.println(result);
+            }
+            i++;
+        }
+
+        System.out.println("count :"+i+", success:"+success);
+
+    }
+
+
+    /**
+     * 对局开始
+     * @return
+     */
+    public static Map fight(){
+
+        HashMap result = new HashMap();
+
+        PaiDui paiDui = new PaiDui();
+
+        List<Pai> guanyuPai = new ArrayList();
+        List<Pai> wuzhugePai = new ArrayList();
+
+        int i = 0;
+        //关羽先手5牌
+        while (i<5){
+            guanyuPai.add((Pai) paiDui.getDeque().pop());
+            i++;
+        }
+        //武诸葛起手7牌
+        i = 0;
+        while(i<7){
+            wuzhugePai.add((Pai) paiDui.getDeque().pop());
+            i++;
+        }
+        result.put("guanyu",guanyuPai.toString());
+        result.put("wuzhuge",wuzhugePai.toString());
+
+        //1.先判断关羽是否有黑色过拆，并使用
+        checkGuoChaiUse(guanyuPai,wuzhugePai);
+
+        //循环检查是否还有存留的顺手，无中和铁锁
+        while(true){
+            boolean isBreak = true;
+            //2.判断关羽是否有顺手，并使用
+            if(checkShunUse(guanyuPai,wuzhugePai)){
+                isBreak = false;
+            }
+            //3.判断关羽是否有无中生有，并使用
+            if(checkWuzhongUse(guanyuPai,wuzhugePai,paiDui)){
+                isBreak = false;
+            }
+            //4.判断关羽是否有铁锁，有则重铸
+            if(checkTieSuoUse(guanyuPai,wuzhugePai,paiDui)){
+                isBreak = false;
+            }
+
+            if(isBreak){
+                break;
+            }
+        }
+
+        result.put("guanyu2",guanyuPai.toString());
+        result.put("wuzhuge2",wuzhugePai.toString());
+
+        //1.2.再判断关羽是否有黑色过拆，并使用
+        checkGuoChaiUse(guanyuPai,wuzhugePai);
+
+        result.put("guanyu3",guanyuPai.toString());
+        result.put("wuzhuge3",wuzhugePai.toString());
+
+        //5.判断关羽是否有连弩，分为两种情况
+        //5.1使用连弩的情况
+        Map useLianNuMap = useLianNu(guanyuPai,wuzhugePai);
+        if((Boolean) useLianNuMap.get("useLianNu")){
+            result.put("result",useLianNuMap.get("result"));
+
+        }else{
+            //5.2不使用连弩的情况
+            result.put("result",noUseLianNu(guanyuPai,wuzhugePai));
+
+        }
+
+        return result;
+
+    }
+
+    /**
+     * 关羽不使用连弩的情况
+     * @param guanyuPai
+     * @param wuzhugePai
+     * @return
+     */
+    private static boolean noUseLianNu(List<Pai> guanyuPai, List<Pai> wuzhugePai) {
+        //关羽先输出决斗，南蛮(Attact1) ,万箭(Attact2)
+        int guanyuSha = 0;
+        int guanyuAttack1 = 0;
+        int guanyuAttack2 = 0;
+        int guanyuWuxie = 0;
+        boolean isJiu = false;
+        for(int i =0;i<guanyuPai.size();i++) {
+            Pai pai = guanyuPai.get(i);
+            if(pai.getType() == 3){
+                //酒加1伤害
+                isJiu = true;
+            }
+            if(pai.getType() == 1){
+                guanyuSha=1;
+            }else if(pai.getType() == 13 && pai.getColor() == 1){
+                //关羽无用牌，红色为杀
+                guanyuSha=1;
+            }else if(pai.getType() == 2||pai.getType() == 14){
+                //关羽闪桃当杀
+                guanyuSha=1;
+            }if (pai.getType() == 11 ||
+                    pai.getType() == 4 ) {
+                guanyuAttack1++;
+            }
+            if (pai.getType() == 5) {
+                guanyuAttack2++;
+            }
+            if (pai.getType() == 6 ) {
+                guanyuWuxie++;
+            }
+
+        }
+
+        //武诸葛杀数量,闪数量,无邪数量,桃数量
+        int wuzhugeSha = 0;
+        int wuzhugeShan = 0;
+        int wuzhugeWuxie = 0;
+        int wuzhugeTao = 0;
+        for(int i =0;i<wuzhugePai.size();i++) {
+            Pai pai = wuzhugePai.get(i);
+            if (pai.getType() == 1) {
+                wuzhugeSha++;
+            }
+            if (pai.getType() == 2) {
+                wuzhugeShan++;
+            }
+            if (pai.getType() == 6 ) {
+                wuzhugeWuxie++;
+            }
+            if (pai.getType() == 14 ) {
+                wuzhugeTao++;
+            }
+        }
+        //如果武诸葛无懈可击大于关羽，添加额外防御
+        if(wuzhugeWuxie>guanyuWuxie){
+            wuzhugeWuxie -= guanyuWuxie;
+        }
+
+        //如果关羽决斗南蛮输出小于武诸葛防御，则为0
+        if(guanyuAttack1<=wuzhugeSha+wuzhugeWuxie){
+            guanyuAttack1 = 0;
+        }else{
+            guanyuAttack1 = guanyuAttack1 - wuzhugeSha - wuzhugeWuxie;
+        }
+
+        //如果关羽杀+万箭数量小于等于武诸葛闪防御，则为0
+        if(guanyuAttack2+guanyuSha<=wuzhugeShan){
+            guanyuAttack2 = 0;
+            guanyuSha = 0;
+        }else if(wuzhugeShan == 1&&guanyuAttack2>0&&guanyuSha>0){
+            //如果武诸葛有一闪，不防万箭，防杀
+            guanyuSha = 0;
+        }
+        //如果武诸葛无闪防酒杀
+        if(wuzhugeShan ==0&&guanyuSha>0&&isJiu){
+            guanyuSha++;
+        }
+
+        //计算总伤害>=4则击杀
+        if(guanyuAttack1+guanyuAttack2+guanyuSha>=4){
+            return true;
+        }
+
+        return false;
+
+    }
+
+    /**
+     * 关羽使用连弩的情况
+     * @param guanyuPai
+     * @param wuzhugePai
+     */
+    private static Map useLianNu(List<Pai> guanyuPai, List<Pai> wuzhugePai) {
+        Map<String,Boolean> resultMap = new HashMap<>();
+        //如果关羽有两把连弩，则使用黑色连弩
+        boolean checkLianNu = false;
+        boolean useLianNu = false;
+        int hongNuIndex = -1;
+        for(int i =0;i<guanyuPai.size();i++){
+            Pai pai = guanyuPai.get(i);
+            if(pai.getType() == 12){
+                checkLianNu = true;
+                if(pai.getColor() == 0){
+                    guanyuPai.remove(pai);
+                    useLianNu = true;
+                    break;
+                }else{
+                    hongNuIndex = i;
+                }
+            }
+        }
+        //为使用连弩则使用红色连弩
+        if(!useLianNu && hongNuIndex!=-1){
+            guanyuPai.remove(guanyuPai.get(hongNuIndex));
+        }
+
+        //存在连弩的情况
+        if(checkLianNu){
+            resultMap.put("useLianNu",true);
+
+            //计算关羽所有杀输出 - 武诸葛的闪桃酒防御结果
+            List<Pai> indexList = new ArrayList();
+            //遍历关羽手牌，找出所有杀牌并使用
+            boolean isJiu = false;
+            for(int i =0;i<guanyuPai.size();i++){
+                Pai pai = guanyuPai.get(i);
+                if(pai.getType() == 3 && pai.getColor() == 0){
+                    //黑色酒加1伤害
+                    isJiu = true;
+                }
+                if(pai.getType() == 1){
+                    indexList.add(pai);
+                }else if(pai.getType() == 13 && pai.getColor() == 1){
+                    //关羽无用牌，红色为杀
+                    indexList.add(pai);
+                }else if(pai.getType() == 2||pai.getType() == 14){
+                    //关羽闪桃当杀
+                    indexList.add(pai);
+                }else if(pai.getType() == 5
+                        ||(pai.getType() == 6&&pai.getColor()==1)
+                        ||(pai.getType() == 8&&pai.getColor()==1)
+                        ||(pai.getType() == 11&&pai.getColor()==1)
+                        ||(pai.getType() == 12&&pai.getColor()==1)){
+                    //关羽万箭当杀，红色无懈可击当杀，红色过拆当杀，红色决斗当杀，红色连弩当杀
+                    indexList.add(pai);
+                }
+            }
+            // 关羽杀输出
+            int guanyuSha = 0;
+            while(indexList.size()>0) {
+                guanyuPai.remove(indexList.get(0));
+                indexList.remove(indexList.get(0));
+                guanyuSha++;
+            }
+            //遍历武诸葛手牌，找出所有防御牌并使用
+            boolean isShan = false;
+            for(int i =0;i<wuzhugePai.size();i++){
+                Pai pai = wuzhugePai.get(i);
+                if(pai.getType() == 14||pai.getType() == 3){
+                    indexList.add(pai);
+                }
+                if(pai.getType() == 2){
+                    isShan = true;
+                    indexList.add(pai);
+                }
+            }
+            // 武诸葛防御
+            int wuzhugeFang = 0;
+            while(indexList.size()>0) {
+                wuzhugePai.remove(indexList.get(0));
+                indexList.remove(indexList.get(0));
+                wuzhugeFang++;
+            }
+
+            //如果关羽有酒，武诸葛无闪则关羽伤害+1，默认武诸葛有闪防酒杀
+            if(isJiu && !isShan){
+                guanyuSha++;
+            }
+
+            if(guanyuSha - wuzhugeFang>=4){
+                //关羽输出足够
+                resultMap.put("result",true);
+                return resultMap;
+            }
+
+            //如果不够则计算其他伤害(南蛮，黑色决斗)
+            //关羽南蛮+黑色决斗数量,黑色无懈可击数量
+            int guanyuSha2 = 0;
+            int guanyuWuxie = 0;
+            for(int i =0;i<guanyuPai.size();i++) {
+                Pai pai = guanyuPai.get(i);
+                if ((pai.getType() == 11 && pai.getColor() == 0)||
+                    pai.getType() == 4 ) {
+                    guanyuSha2++;
+                }
+                if (pai.getType() == 6 && pai.getColor() == 0) {
+                    guanyuWuxie++;
+                }
+            }
+
+            //武诸葛杀
+            int wuzhugeFang2 = 0;
+            int wuzhugeWuxie = 0;
+            for(int i =0;i<wuzhugePai.size();i++) {
+                Pai pai = wuzhugePai.get(i);
+                if (pai.getType() == 1) {
+                    wuzhugeFang2++;
+                }
+                if (pai.getType() == 6 ) {
+                    wuzhugeWuxie++;
+                }
+            }
+            //如果武诸葛无懈可击大于关羽，添加额外防御
+            if(wuzhugeWuxie>guanyuWuxie){
+                wuzhugeFang2+=wuzhugeWuxie-guanyuWuxie;
+            }
+
+            //如果关羽额外输出大于武诸葛额外防御
+            if(guanyuSha2>wuzhugeFang2){
+                //关羽总输出 == 杀输出 + 额外输出
+                guanyuSha = guanyuSha+ (guanyuSha2-wuzhugeFang2);
+                if(guanyuSha-wuzhugeFang>=4){
+                    //关羽总输出足够
+                    resultMap.put("result",true);
+                    return resultMap;
+                }
+            }
+            resultMap.put("result",false);
+
+        }else{
+            resultMap.put("useLianNu",false);
+        }
+
+        return resultMap;
+
+    }
+
+    /**
+     * 判断过拆并使用
+     */
+    private static void checkGuoChaiUse(List<Pai> guanyuPai,List<Pai> wuzhugePai){
+        List<Pai> indexList = new ArrayList();
+        //遍历关羽手牌，找出所有过河拆桥牌并使用
+        for(int i =0;i<guanyuPai.size();i++){
+            Pai pai = guanyuPai.get(i);
+            if(pai.getType() == 8){
+                indexList.add(pai);
+            }
+        }
+
+        int i = 0;
+        while(indexList.size()>0) {
+            guanyuPai.remove(indexList.get(0));
+            indexList.remove(indexList.get(0));
+            i++;
+        }
+
+        //使用所有过拆
+        while(i>0){
+            i--;
+            //默认武诸葛无懈可击不防过拆
+            //默认拆掉第一张手牌
+            wuzhugePai.remove(wuzhugePai.get(0));
+        }
+
+    }
+
+    /**
+     * 判断顺手并使用
+     */
+    private static boolean checkShunUse(List<Pai> guanyuPai,List<Pai> wuzhugePai) {
+        List<Pai> indexList = new ArrayList();
+        //遍历关羽手牌，找出所有顺手牌并使用
+        for(int i =0;i<guanyuPai.size();i++){
+            Pai pai = guanyuPai.get(i);
+            if(pai.getType() == 7){
+                indexList.add(pai);
+            }
+        }
+
+        int i = 0;
+        while(indexList.size()>0) {
+            guanyuPai.remove(indexList.get(0));
+            indexList.remove(indexList.get(0));
+            i++;
+        }
+
+        if(i==0){
+            return false;
+        }
+
+        //使用所有顺手
+        while(i>0){
+            i--;
+            boolean isCanUse = true;//是否可使用
+            //判断诸葛无懈可击并使用
+            while(checkWuxieUse(wuzhugePai)){
+                //判断关羽无懈可击并使用
+                if(!checkWuxieUse(guanyuPai)){
+                    isCanUse = false;
+                    break;
+                };
+            }
+
+            //如果可以使用则使用
+            if(isCanUse){
+                //默认获取第一张手牌
+                Pai firstCard = wuzhugePai.get(0);
+                //如果该牌为顺手则继续使用
+                if(firstCard.getType() == 7){
+                    i++;
+                }else{
+                    //否则关羽获得该牌
+                    guanyuPai.add(firstCard);
+                }
+                wuzhugePai.remove(firstCard);
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * 判断无中生有并使用
+     * @param guanyuPai
+     * @param wuzhugePai
+     */
+    private static boolean checkWuzhongUse(List<Pai> guanyuPai, List<Pai> wuzhugePai,PaiDui paiDui) {
+        List<Pai> indexList = new ArrayList();
+        //遍历关羽手牌，找出所有无中牌并使用
+        for(int i =0;i<guanyuPai.size();i++){
+            Pai pai = guanyuPai.get(i);
+            if(pai.getType() == 9){
+                indexList.add(pai);
+            }
+        }
+
+        int i = 0;
+        while(indexList.size()>0) {
+            guanyuPai.remove(indexList.get(0));
+            indexList.remove(indexList.get(0));
+            i++;
+        }
+
+        if(i==0){
+            return false;
+        }
+
+        //使用所有无中
+        while(i>0){
+            i--;
+            boolean isCanUse = true;//是否可使用
+            //判断诸葛无懈可击并使用
+            while(checkWuxieUse(wuzhugePai)){
+                //判断关羽无懈可击并使用
+                if(!checkWuxieUse(guanyuPai)){
+                    isCanUse = false;
+                    break;
+                };
+            }
+
+            //如果可以使用则使用
+            if(isCanUse){
+                //获得两张牌，分别计算
+                for(int o=0;o<2;o++){
+                    Pai pai = (Pai) paiDui.getDeque().pop();
+                    //如果该牌为顺手则使用
+                    if(pai.getType() == 7){
+                        guanyuPai.add(pai);
+                        checkShunUse(guanyuPai,wuzhugePai);
+                        //如果顺到无中则继续使用
+                        if(guanyuPai.get(guanyuPai.size()-1).getType() == 9){
+                            guanyuPai.remove(guanyuPai.size()-1);
+                            i++;
+                        }
+                    }else if(pai.getType() == 9){
+                        //如果该牌为无中则继续使用
+                        i++;
+                    }else{
+                        //否则关羽获得该牌
+                        guanyuPai.add(pai);
+                    }
+                }
+            }
+        }
+
+        return true;
+
+    }
+
+    /**
+     * 检查铁锁连环并重铸
+     * @param guanyuPai
+     * @param wuzhugePai
+     * @param paiDui
+     */
+    private static boolean checkTieSuoUse(List<Pai> guanyuPai, List<Pai> wuzhugePai, PaiDui paiDui) {
+
+        List<Pai> indexList = new ArrayList();
+        //遍历关羽手牌，找出所有铁锁牌并使用
+        for(int i =0;i<guanyuPai.size();i++){
+            Pai pai = guanyuPai.get(i);
+            if(pai.getType() == 10){
+                indexList.add(pai);
+            }
+        }
+
+        int i = 0;
+        while(indexList.size()>0) {
+            guanyuPai.remove(indexList.get(0));
+            indexList.remove(indexList.get(0));
+            i++;
+        }
+
+        if(i==0){
+            return false;
+        }
+
+        //使用所有铁锁
+        while(i>0){
+            i--;
+            //获取新牌
+            Pai pai = (Pai) paiDui.getDeque().pop();
+            //关羽获得该牌
+            guanyuPai.add(pai);
+
+        }
+
+        return true;
+    }
+
+    /**
+     * 判断无懈可击并使用
+     * @param pais
+     * @return
+     */
+    private static boolean checkWuxieUse(List pais){
+        //遍历手牌，找出无懈可击并使用
+        Iterator iterator = pais.iterator();
+        while (iterator.hasNext()){
+            Pai pai  = (Pai) iterator.next();
+            if(pai.getType() == 6){
+                pais.remove(pai);
+                return true;
+            }
+        }
+        return false;
+
+    }
+}
