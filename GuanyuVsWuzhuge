@@ -155,7 +155,7 @@ public class Main {
             if (pai.getType() == 6 ) {
                 wuzhugeWuxie++;
             }
-            if (pai.getType() == 14 ) {
+            if (pai.getType() == 14 ||pai.getType() ==3) {
                 wuzhugeTao++;
             }
         }
@@ -185,7 +185,7 @@ public class Main {
         }
 
         //计算总伤害>=4则击杀
-        if(guanyuAttack1+guanyuAttack2+guanyuSha>=4){
+        if(guanyuAttack1+guanyuAttack2+guanyuSha-wuzhugeTao>=4){
             return true;
         }
 
