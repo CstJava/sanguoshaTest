@@ -4,16 +4,20 @@ public class Main {
     public static void main(String[] args) {
         int i = 0;
         int success = 0;
-        while(i<100000){
+        int success2 = 0;
+        while(i<1000000){
             Map result = fight();
             if((Boolean) result.get("result")){
                 success++;
                 System.out.println(result);
+                if(result.containsKey("result2")){
+                    success2++;
+                }
             }
             i++;
         }
 
-        System.out.println("count :"+i+", success:"+success);
+        System.out.println("count :"+i+", success:"+success+",无连弩success:"+success2);
 
     }
 
@@ -88,7 +92,7 @@ public class Main {
         }else{
             //5.2不使用连弩的情况
             result.put("result",noUseLianNu(guanyuPai,wuzhugePai));
-
+            result.put("result2","result2");
         }
 
         return result;
